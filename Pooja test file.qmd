@@ -1,0 +1,17 @@
+---
+title: "DS4PP Midterm Project"
+format: html
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+hud_index <- read_csv("HUD Low_Poverty_Index.csv")
+hud_hcv <- read_csv("HUD Housing_Choice_Vouchers_by_Tract.csv")
+evict <- read_csv("Eviction Lab data by census tract 2000-2018.csv")
+
+```
+
+```{r}
+new_hud <- left_join(hud_index, hud_hcv, by = "GEOID")
+```

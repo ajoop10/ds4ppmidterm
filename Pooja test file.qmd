@@ -6,12 +6,38 @@ editor: visual
 
 ```{r}
 library(tidyverse)
-hud_index <- read_csv("HUD Low_Poverty_Index.csv")
+hud_poverty <- read_csv("HUD Low_Poverty_Index.csv")
 hud_hcv <- read_csv("HUD Housing_Choice_Vouchers_by_Tract.csv")
 evict <- read_csv("Eviction Lab data by census tract 2000-2018.csv")
 
 ```
 
 ```{r}
-new_hud <- left_join(hud_index, hud_hcv, by = "GEOID")
+hud_hcv_new <- 
+  hud_hcv |>
+  mutate(EACODE = NULL, EANAME = NULL, Shape__Area = NULL, Shape__Length = NULL) 
+
+hud_poverty_new <-
+  hud_poverty |>
+  mutate(VERSION = NULL, Shape__Area = NULL, Shape__Length = NULL)
+```
+
+```{r}
+joint <- left_join(hud_hcv_new, hud_poverty_new, by = "GEOID") |>
+  drop_na()
+```
+
+```{r}
+joint_filtered <- 
+  joint |>
+  select(GEOID, HCV_PUBLIC, HCV_PUBLIC_PCT, CATEGORY, POV_IDX, STATE_NAME, COUNTY_NAME)
+```
+
+```{r}
+joint_filtered |>
+  group_by(STATE_NAME) |>
+  summarise(avg_poverty = mean(POV_IDX), avg_voucher_pct = mean(HCV_PUBLIC_PCT)) |>
+  ggplot(aes(y = avg_poverty, x = avg_voucher_pct, color = STATE_NAME)) +
+    geom_point()
+
 ```

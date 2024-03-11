@@ -1,0 +1,11 @@
+---
+title: "Housing Choice Voucher Program Analysis in U.S."
+format: html
+editor: visual
+---
+
+## Welcome!
+
+Our DS4PP midterm project is focused on analyzing the distribution of HCVs.
+
+Members: Maya, Pooja, Tiffany

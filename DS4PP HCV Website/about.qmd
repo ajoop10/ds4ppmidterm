@@ -1,0 +1,10 @@
+---
+title: "About"
+---
+
+Our midterm project is focused on the U.S. Housing Choice Voucher Program!
+
+Our group members are Maya, Pooja, and Tiffany! :)
+
+```{}
+```

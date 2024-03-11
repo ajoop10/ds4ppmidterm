@@ -41,3 +41,89 @@ joint_filtered |>
     geom_point()
 
 ```
+
+```{r}
+joint_filtered |>
+    ggplot(aes(x = POV_IDX, y = HCV_PUBLIC_PCT)) +
+    geom_point() +
+  geom_smooth()
+
+```
+
+```{r}
+#converting geoids to numeric to enable joining
+hud_hcv_new <-
+  hud_hcv_new |>
+  mutate(GEOID_new = as.numeric(GEOID))
+
+#filtering eviction data to 2018 (most recent year available)
+evict_2018 <-
+  evict|>
+  filter(year == 2018)
+
+#joining HUD HCV data with 2018 eviction data
+evict_hcv_2018 <- left_join(hud_hcv_new, evict_2018, by = c("GEOID_new" = "fips")) |>
+  drop_na()
+
+#converting geoids to numeric to enable joining
+
+hud_poverty_new <-
+  hud_poverty_new |>
+  mutate(GEOID_new = as.numeric(GEOID))
+
+#joining HUD Poverty Index data with 2018 eviction data
+
+evict_poverty_2018 <- left_join(hud_poverty_new, evict_2018, by = c("GEOID_new" = "fips")) |>
+  drop_na()
+
+#testing scatterplots comparing poverty index with eviction filings by state (poverty index = 100 means no poverty and poverty index = 0 means high poverty & eviction filings rate is number of filings per 100 households) 
+
+
+```
+
+```{r}
+#In Texas, how do evictions vary by the tract's poverty index level? Can remove geom_point and just see the smooth line
+
+evict_poverty_2018 |>
+  filter(STATE_NAME == "Texas") |>
+  ggplot() +
+    geom_point(aes(x = POV_IDX, y = filing_rate), color = "green") +
+    geom_smooth(aes(x = POV_IDX, y = filing_rate), color = "green") +
+    geom_point(aes(x = POV_IDX, y = threatened_rate), color = "red") +
+    geom_smooth(aes(x = POV_IDX, y = threatened_rate), color = "red") +
+    geom_point(aes(x = POV_IDX, y = judgement_rate), color = "blue") +
+    geom_smooth(aes(x = POV_IDX, y = judgement_rate), color = "blue")
+
+evict_poverty_2018 |>
+  filter(STATE_NAME == "Texas") |>
+  ggplot() +
+    geom_smooth(aes(x = POV_IDX, y = filing_rate), color = "green") +
+    geom_smooth(aes(x = POV_IDX, y = threatened_rate), color = "red") +
+    geom_smooth(aes(x = POV_IDX, y = judgement_rate), color = "blue")
+```
+
+```{r}
+#In California, how do evictions vary by the tract's poverty index level? Can remove geom_point and just see the smooth line
+evict_poverty_2018 |>
+  filter(STATE_NAME == "California") |>
+  ggplot() +
+    geom_point(aes(x = POV_IDX, y = filing_rate), color = "green") +
+    geom_smooth(aes(x = POV_IDX, y = filing_rate), color = "green") +
+    geom_point(aes(x = POV_IDX, y = threatened_rate), color = "red") +
+    geom_smooth(aes(x = POV_IDX, y = threatened_rate), color = "red") +
+    geom_point(aes(x = POV_IDX, y = judgement_rate), color = "blue") +
+    geom_smooth(aes(x = POV_IDX, y = judgement_rate), color = "blue")
+```
+
+```{r}
+#In New Mexico, how do evictions vary by the tract's poverty index level? Can remove geom_point and just see the smooth line
+evict_poverty_2018 |>
+  filter(STATE_NAME == "New Mexico") |>
+  ggplot() +
+    geom_point(aes(x = POV_IDX, y = filing_rate), color = "green") +
+    geom_smooth(aes(x = POV_IDX, y = filing_rate), color = "green") +
+    geom_point(aes(x = POV_IDX, y = threatened_rate), color = "red") +
+    geom_smooth(aes(x = POV_IDX, y = threatened_rate), color = "red") +
+    geom_point(aes(x = POV_IDX, y = judgement_rate), color = "blue") +
+    geom_smooth(aes(x = POV_IDX, y = judgement_rate), color = "blue")
+```

@@ -23,8 +23,7 @@ hud_poverty_new <-
 ```
 
 ```{r}
-joint <- left_join(hud_hcv_new, hud_poverty_new, by = "GEOID") |>
-  drop_na()
+joint <- left_join(hud_hcv_new, hud_poverty_new, by = "GEOID")
 ```
 
 ```{r}
@@ -56,14 +55,44 @@ hud_hcv_new <-
   hud_hcv_new |>
   mutate(GEOID_new = as.numeric(GEOID))
 
-#filtering eviction data to 2018 (most recent year available)
+
+# number of renters per census tract
+hud_hcv_new <-
+  hud_hcv_new |>
+  mutate(renter_count = trunc(HCV_PUBLIC/(HCV_PUBLIC_PCT/100)))
+
+#create cofips column in hud_hcv_counties
+hud_hcv_counties <-
+  hud_hcv_new |>
+  mutate(cofips = paste(STATE, COUNTY, sep = ""))
+
+#joining HUD HCV data with all years eviction data
+evict_hcv_allyears <- 
+left_join(hud_hcv_new, evict, by = c("GEOID_new" = "fips"))
+```
+
+```{r}
+#graph of proportion of renters receiving HCV in each state (some states missing like Idaho, North Dakota, South Dakota, double check Mississippi)
+evict_hcv_allyears |>
+  summarize(state_hcv_prop = sum(HCV_PUBLIC)/sum(renter_count), .by = state) |>
+  ggplot(aes(x = state, y = state_hcv_prop)) +
+    geom_col() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+evict_hcv_allyears |>
+  summarize(state_hcv = sum(HCV_PUBLIC), .by = state)
+
+```
+
+
+```{r}
+#filtering eviction data to 2018 (most recent year available)}
 evict_2018 <-
   evict|>
   filter(year == 2018)
 
 #joining HUD HCV data with 2018 eviction data
-evict_hcv_2018 <- left_join(hud_hcv_new, evict_2018, by = c("GEOID_new" = "fips")) |>
-  drop_na()
+evict_hcv_2018 <- left_join(hud_hcv_new, evict_2018, by = c("GEOID_new" = "fips"))
 
 #converting geoids to numeric to enable joining
 
@@ -76,10 +105,11 @@ hud_poverty_new <-
 evict_poverty_2018 <- left_join(hud_poverty_new, evict_2018, by = c("GEOID_new" = "fips")) |>
   drop_na()
 
-#testing scatterplots comparing poverty index with eviction filings by state (poverty index = 100 means no poverty and poverty index = 0 means high poverty & eviction filings rate is number of filings per 100 households) 
 
 
 ```
+
+Testing scatterplots comparing poverty index with eviction filings by state (poverty index = 100 means no poverty and poverty index = 0 means high poverty & eviction filings rate is number of filings per 100 households) 
 
 ```{r}
 #In Texas, how do evictions vary by the tract's poverty index level? Can remove geom_point and just see the smooth line

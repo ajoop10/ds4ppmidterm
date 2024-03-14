@@ -1,0 +1,98 @@
+---
+title: "Midterm_Project"
+format: html
+editor: visual
+---
+
+```{r}
+library("dplyr")
+library(tidyverse)
+```
+
+```{r}
+acs_2019 <- read.csv("ACSDT5Y2019.B25070-Data.csv")
+acs_2020 <- read.csv("ACSDT5Y2020.B25070-Data.csv")
+acs_2021 <- read.csv("ACSDT5Y2021.B25070-Data.csv")
+acs_2022 <- read.csv("ACSDT5Y2022.B25070-Data.csv")
+```
+
+```{r}
+colnames(acs_2019) <- c('geo_id','geo_name','est_total', 'total_error', 'less_than_10', 'less_than_10_error', 'btwn_10_15', 'btwn_10_15_error', 'btwn_15_20', 'btwn_15_20_error', 'btwn_20_25', 'btwn_20_25_error', 'btwn_25_30', 'btwn_25_30_error', 'btwn_30_35', 'btwn_30_35_error', 'btwn_35_40', 'btwn_35_40_error', 'btwn_40_50','btwn_40_50_error', 'more_than_50', 'more_than_50_error', 'not_computed', 'not_comupted_error', 'na') 
+
+```
+
+Dropping the error columns and the observation where geo_id = Geography
+
+```{r}
+acs_2019 |> 
+  select(-matches("(?i)error")) |> 
+  subset(select = -na) |> 
+  filter(geo_id != "Geography") |> 
+  mutate(year = 2019) -> acs_2019
+```
+
+Changing characters to numbers
+
+```{r}
+acs_2019 |> 
+ mutate(across(est_total:year, as.numeric)) -> acs_2019
+```
+
+Creating the counts and proportions for renters who are/are not rent burdened
+
+```{r}
+acs_2019  <- acs_2019  |> 
+  rowwise() |> 
+  mutate(less_than_30 = sum(c_across(less_than_10:btwn_25_30), na.rm = TRUE)) |> 
+  mutate(more_than_30 = sum(c_across(btwn_30_35:more_than_50), na.rm = TRUE)) |> 
+  mutate(less_than_30_percent = less_than_30/est_total) |> 
+  mutate(more_than_30_percent = more_than_30/est_total) |> 
+  ungroup()
+
+```
+
+```{r}
+acs_2019 |> 
+  pivot_longer(-c(geo_id, geo_name, year), names_to = "est_count", values_to = "count") -> acs_2019_long
+
+```
+
+```{r}
+acs_2019_long |> 
+  separate(col = geo_name, 
+           into = c("county", "state"), 
+           sep = ", ") -> acs_2019_long
+
+```
+
+```{r}
+acs_2019_long |> 
+  filter(state %in% c('Alabama','California', 'Texas')) |> 
+  filter(est_count %in% c('less_than_30_percent', 'more_than_30_percent')) |> 
+  ggplot(aes(x = est_count, y = count, color = state)) +
+  geom_point(alpha = 0.5) +
+  facet_wrap(~state)
+```
+
+```{r}
+acs_2019_long |>  
+   filter(county %in% c("Alameda County", "San Diego County", "San Francisco County", "Los Angeles County")) |> 
+  filter(est_count %in% c('less_than_10', 'btwn_10_15', 'btwn_15_20', 'btwn_20_25', 'btwn_25_30', 'btwn_30_35',  'btwn_35_40', 'btwn_40_50', 'more_than_50')) |> 
+  ggplot(aes(x = est_count, y = count, color = county)) +
+  geom_point()
+
+acs_2019_long |>  
+   filter(county %in% c("Alameda County", "San Diego County", "San Francisco County", "Los Angeles County")) |> 
+  filter(est_count %in% c('less_than_30_percent','more_than_30_percent')) |> 
+  ggplot(aes(y = count, x = est_count, color = county)) +
+  geom_point()
+```
+
+```{r}
+acs_merged <- 
+  left_join(acs_2019, acs_2020, by = "GEO_ID")
+acs_merged <- 
+  left_join(acs_merged, acs_2021, by = "GEO_ID")
+acs_merged <- 
+  left_join(acs_merged, acs_2022, by = "GEO_ID")
+```

@@ -9,6 +9,7 @@ library(tidyverse)
 hud_poverty <- read_csv("HUD Low_Poverty_Index.csv")
 hud_hcv <- read_csv("HUD Housing_Choice_Vouchers_by_Tract.csv")
 evict <- read_csv("Eviction Lab data by census tract 2000-2018.csv")
+hud_2023_hcv_ca <- read_csv("hudPicture2022_2020census_571974.csv")
 
 ```
 
@@ -20,9 +21,37 @@ hud_hcv_new <-
 hud_poverty_new <-
   hud_poverty |>
   mutate(VERSION = NULL, Shape__Area = NULL, Shape__Length = NULL)
+
+hud_2023_hcv_ca <-
+  hud_2023_hcv |>
+    mutate(Name = gsub('^="(.*)"$', '\\1', Name), Code = gsub('^="(.*)"$', '\\1', Code))
+
 ```
 
 ```{r}
+hud_2023_hcv_ca |>
+  filter(`Average months on waiting list` > 0) |>
+  ggplot(aes(x = `Average months on waiting list`)) +
+  geom_histogram()
+
+hud_2023_hcv_ca |>
+  filter(`Average months on waiting list` > 0) |>
+  ggplot(aes(Name, `Average months on waiting list`)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+#join 2023 CA HCV data with eviction data
+hud_2023_hcv_ca <-
+  hud_2023_hcv_ca |>
+  mutate(cofips = as.numeric(Code))
+
+#QUESTION: How to summarize eviction data by county? currently at census tract level. left joining does not work!!
+left_join(hud_2023_hcv_ca, evict, by = "cofips")
+
+```
+
+```{r}
+#connecting hud hcv and poverty index csvs
 joint <- left_join(hud_hcv_new, hud_poverty_new, by = "GEOID")
 ```
 
@@ -143,6 +172,21 @@ evict_poverty_2018 |>
     geom_smooth(aes(x = POV_IDX, y = threatened_rate), color = "red") +
     geom_point(aes(x = POV_IDX, y = judgement_rate), color = "blue") +
     geom_smooth(aes(x = POV_IDX, y = judgement_rate), color = "blue")
+```
+```{r}
+
+#In California, how do evictions vary by the tract's poverty index level? Can remove geom_point and just see the smooth line
+
+evict |>
+  filter(STATE_NAME == "California") |>
+  ggplot() +
+    geom_point(aes(x = POV_IDX, y = filing_rate), color = "green") +
+    geom_smooth(aes(x = POV_IDX, y = filing_rate), color = "green") +
+    geom_point(aes(x = POV_IDX, y = threatened_rate), color = "red") +
+    geom_smooth(aes(x = POV_IDX, y = threatened_rate), color = "red") +
+    geom_point(aes(x = POV_IDX, y = judgement_rate), color = "blue") +
+    geom_smooth(aes(x = POV_IDX, y = judgement_rate), color = "blue")
+```
 ```
 
 ```{r}

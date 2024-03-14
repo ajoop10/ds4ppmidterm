@@ -1,0 +1,95 @@
+---
+title: "Maya's Analysis"
+format: html
+editor: visual
+---
+
+#using Pooja's data cleaning code
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(readxl)
+library(dplyr)
+```
+
+```{r}
+hud_poverty <- read_csv("HUD Low_Poverty_Index.csv")
+hud_hcv <- read_csv("HUD Housing_Choice_Vouchers_by_Tract.csv")
+evict <- read_csv("Eviction Lab data by census tract 2000-2018.csv")
+geocodes <- read_excel("all-geocodes-v2020.xlsx", col_names = FALSE)
+
+```
+
+Cleaning weird excel file read in
+
+```{r}
+names(geocodes) <- c("Summary Level", "STATE", "COUNTY", "County Subdivision", "Place Code", "Consolidated Code", "Area Name")
+  
+```
+
+```{r}
+geocodes |>
+  filter(!row_number() %in% c(1:5)) -> clean_geocodes
+
+clean_geocodes |>
+  select(STATE, COUNTY, `Area Name`) -> clean_geocodes2
+```
+
+Cleaning other files
+
+```{r}
+hud_hcv_new <- 
+  hud_hcv |>
+  mutate(EACODE = NULL, EANAME = NULL, Shape__Area = NULL, Shape__Length = NULL) 
+```
+
+#aggregate hcv data by state
+
+```{r}
+hud_hcv_new |>
+  group_by(STATE) |>
+  summarize(total_hcv = sum(HCV_PUBLIC)) -> total_hcv_bystate
+```
+
+```{r}
+left_join(total_hcv_bystate, clean_geocodes2, by = "STATE", multiple = "first") -> foo
+```
+
+```{r}
+foo |>
+  mutate(`Area Name` = fct_reorder(`Area Name`, total_hcv, .desc = FALSE)) |>
+  filter(`Area Name` %in% c("California", "New York", "Texas", "Florida", "Illinois")) |>
+  ggplot(aes(x = `Area Name`, y = total_hcv)) +
+  geom_bar(stat = "identity") +
+  theme_classic() +
+  labs( x = "State", y = "Total HCV Count", title = "Top 5 States with Highest Number of Housing Choice Vouchers") +
+  scale_y_continuous(labels = scales::comma) +
+   coord_flip( )
+```
+
+#aggregate HCV data by county for California state, I know CA code is 06
+
+```{r}
+CA <-
+  hud_hcv_new |>
+  filter(STATE == "06") |>
+  group_by(STATE, COUNTY) |>
+  summarize(total_hcv = sum(HCV_PUBLIC))
+
+CA |>
+  left_join(clean_geocodes2, by = c("STATE", "COUNTY")) -> CA_named
+```
+
+```{r}
+CA_named |>
+  mutate(`Area Name` = fct_reorder(`Area Name`, total_hcv, .desc = FALSE)) |>
+  ggplot(aes(x = `Area Name`, y = total_hcv)) +
+  geom_bar(stat = "identity") +
+  theme_classic() +
+  labs( x = "County", y = "Total HCV Count", title = "Distribution of HCV in California by County ") +
+  scale_y_continuous(labels = scales::comma) +
+     coord_flip( )
+```
+
+Let's make a pie chart?

@@ -60,8 +60,8 @@ left_join(total_hcv_bystate, clean_geocodes2, by = "STATE", multiple = "first") 
 foo |>
   mutate(`Area Name` = fct_reorder(`Area Name`, total_hcv, .desc = FALSE)) |>
   filter(`Area Name` %in% c("California", "New York", "Texas", "Florida", "Illinois")) |>
-  ggplot(aes(x = `Area Name`, y = total_hcv)) +
-  geom_bar(stat = "identity") +
+  ggplot(aes(x = `Area Name`, y = total_hcv, fill = `Area Name`)) +
+  geom_bar(stat = "identity",show.legend = FALSE) +
   theme_classic() +
   labs( x = "State", y = "Total HCV Count", title = "Top 5 States with Highest Number of Housing Choice Vouchers") +
   scale_y_continuous(labels = scales::comma) +
@@ -92,4 +92,57 @@ CA_named |>
      coord_flip( )
 ```
 
-Let's make a pie chart?
+Look at Housing Choice Vouchers as a Percentage of Renter Occupied Housing Units (data is already a variable in HUD Data Set
+
+Take the mean HCV percent out of renter units for a whole state....
+
+```{r}
+hud_hcv_new |>
+  group_by(STATE) |>
+  summarize(avg_hcv_rent = mean(HCV_PUBLIC_PCT)) -> total_hcvbyrent_bystate
+```
+
+```{r}
+left_join(total_hcvbyrent_bystate, clean_geocodes2, by = "STATE", multiple = "first") -> foo2
+```
+
+```{r}
+foo2 |>
+  mutate(`Area Name` = fct_reorder(`Area Name`, avg_hcv_rent, .desc = FALSE)) |>
+  filter(`Area Name` %in% c("Louisiana", "Vermont", "Alabama", "Mississippi", "Massachusetts")) |>
+  ggplot(aes(x = `Area Name`, y = avg_hcv_rent, fill = `Area Name`)) +
+  geom_bar(stat = "identity",show.legend = FALSE) +
+  theme_classic() +
+  labs( x = "State", y = "Average HCV as % of Renter Occupied Housing Units", title = "Top 5 States with Highest Average HCV % of Rental Units") +
+   coord_flip( )
+```
+
+Do the same but now just look at CA counties
+
+```{r}
+CA2 <-
+  hud_hcv_new |>
+  filter(STATE == "06") |>
+  group_by(STATE, COUNTY) |>
+  summarize(avg_hcv = mean(HCV_PUBLIC_PCT))
+
+CA2 |>
+  left_join(clean_geocodes2, by = c("STATE", "COUNTY")) -> CA_named2
+```
+
+Get rid of county in names of area name:
+
+```{r}
+CA_named2$`Area Name` <- gsub("County", "", as.character(CA_named2$`Area Name`))
+```
+
+```{r}
+CA_named2 |>
+  mutate(`Area Name` = fct_reorder(`Area Name`, avg_hcv, .desc = FALSE)) |>
+  ggplot(aes(x = `Area Name`, y = avg_hcv, fill = `Area Name`)) +
+  geom_bar(stat = "identity",show.legend = FALSE) +
+  labs( x = "Counties", y = "Average HCV as % of Renter Units", title = "Average HCV % of Rental Units Across CA Counties") +
+  coord_flip() +
+  theme_classic() +
+  scale_fill_viridis(discrete = TRUE, option = "D")
+```

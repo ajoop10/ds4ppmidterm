@@ -17,31 +17,31 @@ acs_2022 <- read.csv("ACSDT5Y2022.B25070-Data.csv")
 ```
 
 ```{r}
-colnames(acs_2019) <- c('geo_id','geo_name','est_total', 'total_error', 'less_than_10', 'less_than_10_error', 'btwn_10_15', 'btwn_10_15_error', 'btwn_15_20', 'btwn_15_20_error', 'btwn_20_25', 'btwn_20_25_error', 'btwn_25_30', 'btwn_25_30_error', 'btwn_30_35', 'btwn_30_35_error', 'btwn_35_40', 'btwn_35_40_error', 'btwn_40_50','btwn_40_50_error', 'more_than_50', 'more_than_50_error', 'not_computed', 'not_comupted_error', 'na') 
+colnames(acs_2020) <- c('geo_id','geo_name','est_total', 'total_error', 'less_than_10', 'less_than_10_error', 'btwn_10_15', 'btwn_10_15_error', 'btwn_15_20', 'btwn_15_20_error', 'btwn_20_25', 'btwn_20_25_error', 'btwn_25_30', 'btwn_25_30_error', 'btwn_30_35', 'btwn_30_35_error', 'btwn_35_40', 'btwn_35_40_error', 'btwn_40_50','btwn_40_50_error', 'more_than_50', 'more_than_50_error', 'not_computed', 'not_comupted_error', 'na') 
 
 ```
 
 Dropping the error columns and the observation where geo_id = Geography
 
 ```{r}
-acs_2019 |> 
+acs_2020 |> 
   select(-matches("(?i)error")) |> 
   subset(select = -na) |> 
   filter(geo_id != "Geography") |> 
-  mutate(year = 2019) -> acs_2019
+  mutate(year = 2020) -> acs_2020
 ```
 
 Changing characters to numbers
 
 ```{r}
-acs_2019 |> 
- mutate(across(est_total:year, as.numeric)) -> acs_2019
+acs_2020 |> 
+ mutate(across(est_total:year, as.numeric)) -> acs_2020
 ```
 
 Creating the counts and proportions for renters who are/are not rent burdened
 
 ```{r}
-acs_2019  <- acs_2019  |> 
+acs_2020  <- acs_2020  |> 
   rowwise() |> 
   mutate(less_than_30 = sum(c_across(less_than_10:btwn_25_30), na.rm = TRUE)) |> 
   mutate(more_than_30 = sum(c_across(btwn_30_35:more_than_50), na.rm = TRUE)) |> 
@@ -52,21 +52,25 @@ acs_2019  <- acs_2019  |>
 ```
 
 ```{r}
-acs_2019 |> 
-  pivot_longer(-c(geo_id, geo_name, year), names_to = "est_count", values_to = "count") -> acs_2019_long
+acs_2020 |> 
+  pivot_longer(-c(geo_id, geo_name, year), names_to = "est_count", values_to = "count") -> acs_2020_long
 
 ```
 
 ```{r}
-acs_2019_long |> 
+acs_2020_long |> 
   separate(col = geo_name, 
            into = c("county", "state"), 
-           sep = ", ") -> acs_2019_long
+           sep = ", ") -> acs_2020_long
 
+acs_2020 |> 
+  separate(col = geo_name, 
+           into = c("county", "state"), 
+           sep = ", ") -> acs_2020
 ```
 
 ```{r}
-acs_2019_long |> 
+acs_2020_long |> 
   filter(state %in% c('Alabama','California', 'Texas')) |> 
   filter(est_count %in% c('less_than_30_percent', 'more_than_30_percent')) |> 
   ggplot(aes(x = est_count, y = count, color = state)) +
@@ -75,13 +79,13 @@ acs_2019_long |>
 ```
 
 ```{r}
-acs_2019_long |>  
+acs_2020_long |>  
    filter(county %in% c("Alameda County", "San Diego County", "San Francisco County", "Los Angeles County")) |> 
   filter(est_count %in% c('less_than_10', 'btwn_10_15', 'btwn_15_20', 'btwn_20_25', 'btwn_25_30', 'btwn_30_35',  'btwn_35_40', 'btwn_40_50', 'more_than_50')) |> 
   ggplot(aes(x = est_count, y = count, color = county)) +
   geom_point()
 
-acs_2019_long |>  
+acs_2020_long |>  
    filter(county %in% c("Alameda County", "San Diego County", "San Francisco County", "Los Angeles County")) |> 
   filter(est_count %in% c('less_than_30_percent','more_than_30_percent')) |> 
   ggplot(aes(y = count, x = est_count, color = county)) +
@@ -89,10 +93,44 @@ acs_2019_long |>
 ```
 
 ```{r}
+library(readr)
+housing_voucher_data <- read_csv("~/Desktop/ds4pp/ds4pp_project/Housing_Choice_Vouchers_by_Tract_-617893789334587512.csv")
+
+```
+
+```{r}
+colnames(housing_voucher_data) <- tolower(colnames(housing_voucher_data))
+housing_voucher_data |> 
+ mutate(across(hcv_public:shape__length, as.numeric)) -> housing_voucher_data
+
+housing_voucher_data |> 
+  select(geoid, hcv_public, hcv_public_pct) -> housing_voucher_data
+```
+
+```{r}
 acs_merged <- 
-  left_join(acs_2019, acs_2020, by = "GEO_ID")
-acs_merged <- 
-  left_join(acs_merged, acs_2021, by = "GEO_ID")
-acs_merged <- 
-  left_join(acs_merged, acs_2022, by = "GEO_ID")
+  left_join(acs_2020, housing_voucher_data, by = c('geo_id' = 'geoid'))
+
+```
+
+```{r}
+acs_merged |> 
+  pivot_longer(-c(geo_id, year, state, county), names_to = "est_count", values_to = "count") -> acs_merged_long
+```
+
+```{r}
+acs_merged_long |>  
+   filter(county %in% c("Alameda County", "San Diego County", "San Francisco County", "Los Angeles County")) |> 
+  filter(est_count %in% c('less_than_30_percent','more_than_30_percent')) |> 
+  ggplot(aes(y = count, x = county, fill = est_count)) +
+  geom_col() +
+  theme_minimal() +
+  labs(x = "", y = "Percentage of household income spent on housing costs", title = "ACS: Housing Cost Burden in 2020") +
+  scale_fill_discrete(labels = c("less than 30%", "more than 30%")) +
+  theme(axis.title=element_text(family="Times New Roman", size=7),
+        axis.text=element_text(family="Times New Roman", size=7),
+        legend.text=element_text(family="Times New Roman", size=7),
+        legend.title=element_text(family="Times New Roman", size=0),
+        plot.title=element_text(family="Times New Roman", size=8)) +
+  scale_fill_manual(values=c('#56B4E9', '#E69F00'))
 ```

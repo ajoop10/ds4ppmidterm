@@ -44,29 +44,28 @@ Creating the counts and proportions for renters who are/are not rent burdened
 acs_2020  <- acs_2020  |> 
   rowwise() |> 
   mutate(less_than_30 = sum(c_across(less_than_10:btwn_25_30), na.rm = TRUE)) |> 
-  mutate(more_than_30 = sum(c_across(btwn_30_35:more_than_50), na.rm = TRUE)) |> 
-  mutate(less_than_30_percent = less_than_30/est_total) |> 
-  mutate(more_than_30_percent = more_than_30/est_total) |> 
+  mutate(more_than_30 = sum(c_across(btwn_30_35:more_than_50), na.rm = TRUE)) |>  
+ ungroup()
+```
+
+```{r}
+acs_2020 <- acs_2020 |> 
+  rowwise() |> 
+  mutate(less_than_30_percent = less_than_30/(est_total - not_computed)) |> 
+  mutate(more_than_30_percent = more_than_30/(est_total- not_computed)) |> 
   ungroup()
-
 ```
 
 ```{r}
-acs_2020 |> 
-  pivot_longer(-c(geo_id, geo_name, year), names_to = "est_count", values_to = "count") -> acs_2020_long
-
-```
-
-```{r}
-acs_2020_long |> 
-  separate(col = geo_name, 
-           into = c("county", "state"), 
-           sep = ", ") -> acs_2020_long
-
 acs_2020 |> 
   separate(col = geo_name, 
            into = c("county", "state"), 
            sep = ", ") -> acs_2020
+```
+
+```{r}
+acs_2020 |> 
+  pivot_longer(-c(geo_id, county, state, year), names_to = "est_count", values_to = "count") -> acs_2020_long
 ```
 
 ```{r}
@@ -103,13 +102,37 @@ colnames(housing_voucher_data) <- tolower(colnames(housing_voucher_data))
 housing_voucher_data |> 
  mutate(across(hcv_public:shape__length, as.numeric)) -> housing_voucher_data
 
-housing_voucher_data |> 
-  select(geoid, hcv_public, hcv_public_pct) -> housing_voucher_data
+```
+
+Creating a geo_id col in housing voucher that contains state + county
+
+```{r}
+housing_voucher_data$geo_id <- paste0(housing_voucher_data$state, housing_voucher_data$county)
+acs_2020$geo_id <- substr(acs_2020$geo_id, start = nchar(acs_2020$geo_id) - 4, stop = nchar(acs_2020$geo_id))
+```
+
+Grouping by state and county to aggregate data in housing vouchers
+
+```{r}
+housing_voucher_data |>  
+  group_by(geo_id) |> 
+  summarize(hcv_public_count = sum(hcv_public)) -> hcv_public_count
+housing_voucher_data |>  
+  group_by(geo_id) |> 
+  summarize(hcv_public_pct = mean((hcv_public_pct)/100)) -> hcv_pct
+
+hcv_state_county <- 
+  left_join(hcv_public_count, hcv_pct, by = ('geo_id'))
+
+
 ```
 
 ```{r}
+hcv_state_county |> 
+  select(geo_id, hcv_public_count, hcv_public_pct) -> hcv_state_county
+
 acs_merged <- 
-  left_join(acs_2020, housing_voucher_data, by = c('geo_id' = 'geoid'))
+  left_join(acs_2020, hcv_state_county, by = ('geo_id'))
 
 ```
 
@@ -132,5 +155,54 @@ acs_merged_long |>
         legend.text=element_text(family="Times New Roman", size=7),
         legend.title=element_text(family="Times New Roman", size=0),
         plot.title=element_text(family="Times New Roman", size=8)) +
-  scale_fill_manual(values=c('#56B4E9', '#E69F00'))
+  scale_fill_manual(values=c('#56B4E9', '#E69F00')) 
+  
+```
+
+Looking at CA counties larger than 100000 renters
+
+```{r}
+acs_merged |>
+  filter(state == "California") |> 
+  filter(est_total > 100000)  -> ca_counties
+
+ca_counties <- 
+  left_join(ca_counties, hcv_state_county, by = ('geo_id'))
+
+ca_counties |> 
+  pivot_longer(-c(geo_id, year, state, county), names_to = "est_count", values_to = "count") -> ca_counties_long
+```
+
+```{r}
+ca_counties_long |> 
+  filter(est_count %in% c('less_than_30_percent','more_than_30_percent')) |> 
+  ggplot(aes(x = count, y = county, fill = est_count)) +
+  geom_col() +
+  theme_minimal() +
+  labs(y = "", x = "Percentage of household income spent on housing costs", title = "ACS: Housing Cost Burden in 2020") +
+  scale_fill_discrete(labels = c("less than 30%", "more than 30%")) +
+  theme(axis.title=element_text(family="Times New Roman", size=7),
+        axis.text=element_text(family="Times New Roman", size=7),
+        legend.text=element_text(family="Times New Roman", size=7),
+        legend.title=element_text(family="Times New Roman", size=0),
+        plot.title=element_text(family="Times New Roman", size=8)) +
+  scale_fill_manual(values=c('#56B4E9', '#E69F00')) 
+```
+
+```{r}
+acs_merged_long |>  
+   filter(county %in% c("Alameda County", "San Diego County", "San Francisco County", "Los Angeles County")) |> 
+  filter(est_count %in% c('less_than_30_percent','more_than_30_percent', 'hcv_public_pct')) |> 
+  ggplot(aes(y = count, x = county, fill = est_count)) +
+  geom_col() +
+  theme_minimal() +
+  labs(x = "", y = "Percentage of household income spent on housing costs", title = "ACS: Housing Cost Burden in 2020") +
+  scale_fill_discrete(labels = c("less than 30%", "more than 30%", "hcv_percent")) +
+  theme(axis.title=element_text(family="Times New Roman", size=7),
+        axis.text=element_text(family="Times New Roman", size=7),
+        legend.text=element_text(family="Times New Roman", size=7),
+        legend.title=element_text(family="Times New Roman", size=0),
+        plot.title=element_text(family="Times New Roman", size=8)) +
+  scale_fill_manual(values=c('#56B4E9', '#E69F00', 'red')) 
+  
 ```

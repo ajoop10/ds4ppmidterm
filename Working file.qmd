@@ -7,15 +7,22 @@ editor: visual
 ```{r}
 #reading in all the csvs
 library(tidyverse)
+library(ggplot2)
+install.packages("ggthemes")
+library(ggthemes)
+library(plotly)
+
 hud_poverty <- read_csv("HUD Low_Poverty_Index.csv")
 hud_hcv <- read_csv("HUD Housing_Choice_Vouchers_by_Tract.csv")
 evict <- read_csv("Eviction Lab data by census tract 2000-2018.csv")
+evict_county <- read_csv("county_court-issued_2000_2018.csv")
 hud_2023_hcv_ca <- read_csv("hudPicture2022_2020census_571974.csv")
 
 ```
 
 ```{r}
 #cleaning up files
+
 hud_hcv_new <- 
   hud_hcv |>
   mutate(EACODE = NULL, EANAME = NULL, Shape__Area = NULL, Shape__Length = NULL) 
@@ -25,7 +32,7 @@ hud_poverty_new <-
   mutate(VERSION = NULL, Shape__Area = NULL, Shape__Length = NULL)
 
 hud_2023_hcv_ca <-
-  hud_2023_hcv |>
+  hud_2023_hcv_ca |>
     mutate(Name = gsub('^="(.*)"$', '\\1', Name), Code = gsub('^="(.*)"$', '\\1', Code))
 
 ```
@@ -40,16 +47,106 @@ hud_2023_hcv_ca |>
 #Bar graph of every CA county and average wait time for HCV
 hud_2023_hcv_ca |>
   filter(`Average months on waiting list` > 0) |>
-  ggplot(aes(Name, `Average months on waiting list`)) +
+  ggplot(aes(fct_reorder(Name, `Average months on waiting list`), `Average months on waiting list`)) +
   geom_col() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "County Name", y = "Average Months on Waiting List", title = "Average Wait Time for HCVs in California Counties in 2023")
 
-#join 2023 CA HCV data with eviction data
+hud_2023_hcv_ca |>
+  filter(`Average months on waiting list` > 0) |>
+  summarize(avg_wait_ca = mean(`Average months on waiting list`)
+
+#join 2023 CA HCV county data with eviction data
 hud_2023_hcv_ca <-
   hud_2023_hcv_ca |>
   mutate(cofips = as.numeric(Code))
 
-#QUESTION: How to summarize eviction data by county? currently at census tract level. left joining does not work!!
-left_join(hud_2023_hcv_ca, evict, by = "cofips")
+hcv_evict_ca_county <-
+left_join(hud_2023_hcv_ca, evict_county, by = c("cofips" = "fips_county"))
 
+#remove silly columns
+hcv_evict_ca_county <-
+  hcv_evict_ca_county |>
+  select(-c(`Summary level`, `Program label`, Program, `Sub-program`))
+```
+
+
+```{r}
+#make new column for number of eviction filings observed by 100 renting households
+hcv_evict_ca_county <-
+  hcv_evict_ca_county |>
+    mutate(filings_rate = (filings_observed/renting_hh)*100)
+
+#make new column for number of HCVs by 100 renting households
+hcv_evict_ca_county <-  
+  hcv_evict_ca_county |>
+    mutate(HCV_rate = (`# Reported`/renting_hh)*100)
+
+
+#graph eviction filings rate from 2010-2018 for large counties (over 100,000 renters)
+hcv_evict_ca_county|>
+  filter(year > 2010 & year < 2018, renting_hh > 100000) |>
+  ggplot() +
+    geom_line(aes(x = year, y = filings_rate, color = Name)) +
+    labs(x = "Year", y = "Eviction filing rate (per 100 renter households)", title = "Eviction Filings from 2010-2017 in Large California Counties", subtitle = "Large counties are classified as having more than 100,000 renters")
+  
+#testing interactive plot for eviction filings rate
+testing <-
+  hcv_evict_ca_county|>
+  filter(year > 2010 & year < 2018, renting_hh > 100000) |>
+  ggplot() +
+    geom_line(aes(x = year, y = filings_rate, color = Name))
+
+ggplotly(testing)
+
+#histogram of number of renters by county 
+evict_county |>
+  filter(state == "California", renting_hh > 100000) |>
+  ggplot() +
+    geom_histogram(aes(renting_hh))
+
+#summarize HCV rate by county
+hcv_evict_ca_county_summary <-
+hcv_evict_ca_county |>
+  summarize(avg_filing_rate = mean(filings_rate), avg_HCV_rate = mean(HCV_rate), .by = Name, avg_renting_hhs = mean(renting_hh), avg_wait_time = mean(`Average months on waiting list`), avg_tenure = mean(`Average months since moved in`))
+
+#graph avg wait times in counties with over 100k renters
+hcv_evict_ca_county_summary|>
+  filter(avg_wait_time > 0, avg_renting_hhs > 100000) |>
+  ggplot(aes(fct_reorder(Name, avg_wait_time), avg_wait_time)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "County Name", y = "Average Months on Waiting List", title = "Average Wait Time for HCVs in Large California Counties in 2023")
+
+#graph avg tenure in HCV program in counties with over 100k renters
+hcv_evict_ca_county_summary|>
+  filter(avg_tenure > 0, avg_renting_hhs > 100000) |>
+  ggplot(aes(fct_reorder(Name, avg_tenure), avg_tenure)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "County Name", y = "Average Months Since Moved In", title = "Average Tenure in HCV program in Large California Counties in 2023")
+
+#create a new column designating size of rental market in each county
+hcv_evict_ca_county_summary <-
+hcv_evict_ca_county_summary |>
+  mutate(quartile_rentals = cut(avg_renting_hhs,
+                       breaks = quantile(avg_renting_hhs, probs = c(0, 0.25, 0.50, 0.75, 1), na.rm = TRUE),
+                       include.lowest = TRUE,
+                       labels = c("small", "medium", "large", "very large")))
+
+
+hcv_evict_ca_county_summary |>
+  filter(avg_HCV_rate > 0) |>
+  ggplot(aes(y = avg_filing_rate, x = avg_HCV_rate)) +
+    geom_point() +
+    geom_smooth()
+```
+
+
+```{r}
+cleaned_hud_2023_hcv_ca <-
+  hud_2023_hcv_ca|> 
+  mutate_all(~ifelse(. < 0, NA, .))
+
+summary(cleaned_hud_2023_hcv_ca)
 ```

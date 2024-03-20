@@ -22,23 +22,17 @@ hud_2023_hcv_ca <- read_csv("hudPicture2022_2020census_571974.csv")
 hud_2023_hcv_ca <-
   hud_2023_hcv_ca |>
     mutate(Name = gsub('^="(.*)"$', '\\1', Name), Code = gsub('^="(.*)"$', '\\1', Code))
-
 ```
 
 ```{r}
-#Bar graph of every CA county and average wait time for HCV
-hud_2023_hcv_ca |>
-  filter(`Average months on waiting list` > 0) |>
-  ggplot(aes(fct_reorder(Name, `Average months on waiting list`), `Average months on waiting list`)) +
-  geom_col() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  labs(x = "County Name", y = "Average Months on Waiting List", title = "Average Wait Time for HCVs in California Counties in 2023")
+
+#Find average of average waiting time for HCV across CA counties
 
 hud_2023_hcv_ca |>
   filter(`Average months on waiting list` > 0) |>
   summarize(avg_wait_ca = mean(`Average months on waiting list`))
 
-#join 2023 CA HCV county data with eviction data
+#join 2023 CA HCV county data with eviction data on a county-level
 
 hud_2023_hcv_ca <-
   hud_2023_hcv_ca |>
@@ -53,7 +47,6 @@ hcv_evict_ca_county <-
   select(-c(`Summary level`, `Program label`, Program, `Sub-program`))
 ```
 
-
 ```{r}
 #make new column for number of eviction filings observed by 100 renting households
 hcv_evict_ca_county <-
@@ -65,27 +58,36 @@ hcv_evict_ca_county <-
   hcv_evict_ca_county |>
     mutate(HCV_rate = (`# Reported`/renting_hh)*100)
 
-#graph eviction filings rate from 2010-2018 for large counties (over 100,000 renters)
-hcv_evict_ca_county|>
-  filter(year > 2010 & year < 2018, renting_hh > 100000) |>
-  ggplot() +
-    geom_line(aes(x = year, y = filings_rate, color = Name)) +
-    labs(x = "Year", y = "Eviction filing rate (per 100 renter households)", title = "Eviction Filings from 2010-2017 in Large California Counties", subtitle = "Large counties are classified as having more than 100,000 renters")
-
-#summarize HCV rate by county
+#summarize HCV rate, eviction filings rate, wait times by county
 hcv_evict_ca_county_summary <-
 hcv_evict_ca_county |>
   summarize(avg_filing_rate = mean(filings_rate), avg_HCV_rate = mean(HCV_rate), .by = Name, avg_renting_hhs = mean(renting_hh), avg_wait_time = mean(`Average months on waiting list`), avg_tenure = mean(`Average months since moved in`))
+```
 
-#graph avg wait times in counties with over 100k renters
+```{r}
+#Bar graph of every CA county and average wait time for HCV
+hud_2023_hcv_ca |>
+  filter(`Average months on waiting list` > 0) |>
+  ggplot(aes(fct_reorder(Name, `Average months on waiting list`), `Average months on waiting list`)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "County Name", y = "Average Months on Waiting List", title = "Average Wait Time for HCVs in California Counties in 2023")
+
+#Bar graph of large CA counties with 100k renters and average wait time for HCV
 hcv_evict_ca_county_summary|>
   filter(avg_wait_time > 0, avg_renting_hhs > 100000) |>
   ggplot(aes(fct_reorder(Name, avg_wait_time), avg_wait_time)) +
   geom_col() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   labs(x = "County Name", y = "Average Months on Waiting List", title = "Average Wait Time for HCVs in Large California Counties in 2023")
+#graph eviction filings rate from 2010-2018 for large counties (over 100k renters)
+hcv_evict_ca_county|>
+  filter(year > 2010 & year < 2018, renting_hh > 100000) |>
+  ggplot() +
+    geom_line(aes(x = year, y = filings_rate, color = Name)) +
+    labs(x = "Year", y = "Eviction filing rate (per 100 renter households)", title = "Eviction Filings from 2010-2017 in Large California Counties", subtitle = "Large counties are classified as having more than 100,000 renters")
 
-
+#test scatterplot of avg eviction filing rate by avg HCV rate
 hcv_evict_ca_county_summary |>
   filter(avg_HCV_rate > 0) |>
   ggplot(aes(y = avg_filing_rate, x = avg_HCV_rate)) +
@@ -93,8 +95,8 @@ hcv_evict_ca_county_summary |>
     geom_smooth()
 ```
 
-
 ```{r}
+#Summary statistics for 2023 CA county-level HCV data (changing any negative numbers to NA to prevent data from skewing)
 cleaned_hud_2023_hcv_ca <-
   hud_2023_hcv_ca|> 
   mutate_all(~ifelse(. < 0, NA, .))
